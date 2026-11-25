@@ -196,6 +196,8 @@ type DispatcherConfig struct {
 	// ChainPause is the chain's pause of dispatch to this Worker: while it is
 	// set every offer is refused NO_CAPACITY. Nil means the chain is not asked.
 	ChainPause *ChainPause
+	// AuditOnly is a node with no model service: every offer is refused.
+	AuditOnly bool
 }
 
 // Dispatcher answers DispatchOfferV1, DispatchRevokeV1 and

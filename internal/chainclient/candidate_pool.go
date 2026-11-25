@@ -205,5 +205,17 @@ func (c *KeeperABCIClient) verifierWindowMember(ctx context.Context, taskID stri
 			InferReceiptHash: ProtoBytes32(window.InferReceiptHash), ExpiryHeight: window.HandraiseCloseHeight,
 		}, nil
 	}
-	return VerifierCandidateMemberSnapshot{}, fmt.Errorf("operator %s is not in the READY verifier window for verify_round %d", operatorAddress, verifyRound)
+	return VerifierCandidateMemberSnapshot{}, &notVerifierCandidateError{
+		msg: fmt.Sprintf("operator %s is not in the READY verifier window for verify_round %d", operatorAddress, verifyRound)}
 }
+
+// ErrNotVerifierCandidate is a READY verifier window that does not list the
+// operator: waiting does not change it.
+var ErrNotVerifierCandidate = errors.New("operator is not in the READY verifier window")
+
+// notVerifierCandidateError keeps the message callers already log while
+// answering errors.Is(err, ErrNotVerifierCandidate).
+type notVerifierCandidateError struct{ msg string }
+
+func (e *notVerifierCandidateError) Error() string        { return e.msg }
+func (e *notVerifierCandidateError) Is(target error) bool { return target == ErrNotVerifierCandidate }

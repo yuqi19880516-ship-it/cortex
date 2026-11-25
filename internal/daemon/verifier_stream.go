@@ -25,7 +25,11 @@ type VerifierStreamConfig struct {
 	// Assignment applies a VerifierAssignmentNotifyV1: TaskRunner.recordVerifierAssignment.
 	Assignment func(context.Context, *nexusv1.VerifierAssignmentNotifyV1) error
 	// Wake nudges the poll loop after a fresh OPEN_VERIFY: TaskRunner.Wake.
-	Wake   func()
+	Wake func()
+	// Panel answers OPEN_VERIFY for the Verifier panel rounds of anchor audits
+	// (verify_round 2 and above). Nil leaves such a message refused as an
+	// unsupported round, as before.
+	Panel  *PanelHandraiser
 	Logger *slog.Logger
 }
 
@@ -110,6 +114,9 @@ func (s *VerifierStream) checkBinding(ctx context.Context, from string, b *nexus
 func (s *VerifierStream) openVerify(ctx context.Context, from string, m *nexusv1.OpenVerifyV1) error {
 	if err := s.checkBinding(ctx, from, m.GetBinding()); err != nil {
 		return err
+	}
+	if s.cfg.Panel != nil && IsPanelRound(m) {
+		return s.cfg.Panel.OpenVerify(m)
 	}
 	trigger, err := openVerifyTrigger(from, m)
 	if err != nil {

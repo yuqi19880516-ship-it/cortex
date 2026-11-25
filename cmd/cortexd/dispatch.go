@@ -61,11 +61,16 @@ func newDispatchPlane(cfg config.Config, rt *daemon.Runtime, runner *daemon.Task
 		pause = daemon.NewChainPause(reader, cfg.LocalIdentity.OperatorAddress,
 			time.Duration(cfg.Dispatch.ChainPauseRefreshMS)*time.Millisecond, nil, slog.Default())
 	}
+	panel, err := newPanelHandraiser(cfg, rt)
+	if err != nil {
+		return nil, err
+	}
 	return daemon.NewDispatchPlane(context.Background(), daemon.DispatchPlaneConfig{
 		Streams: rt.Dispatch, Runner: runner, Evidence: ev, Store: rt.Store,
 		ChainID: cfg.ChainID, Operator: cfg.LocalIdentity.OperatorAddress, FeeDenom: cfg.Tx.FeeDenom,
 		Profiles: profiles, Dispatch: cfg.Dispatch, Capacity: cfg.ModelManagement.MaxConcurrency,
 		Local: rt.HandraiseLocal(), Anchor: daemon.AnchorProberOf(rt.Dependencies.Model), AnchorAdmission: rt.AnchorAdmission(), ChainPause: pause,
+		Panel: panel, AuditOnly: cfg.AuditOnly(),
 		Sign: rt.DispatchSigner(), Submitter: submitter,
 		HandraiseChain: chain, DispatchChain: chain, VerifierChain: chain, OmissionChain: chain,
 		Rosters: rt.DispatchRosters(),
@@ -81,4 +86,29 @@ func registerDispatchHealth(health *observability.Health, rt *daemon.Runtime) {
 	for _, s := range rt.Dispatch.Statuses() {
 		health.RegisterDependency(s.Name, s.Name == daemon.DependencyDispatchStreams)
 	}
+}
+
+// newPanelHandraiser builds the answer to OPEN_VERIFY for Verifier panel rounds
+// of anchor audits, or nil when the audit capability is off. It needs the
+// Builder streams, the chain's candidate window and the node's service key:
+// no model service.
+func newPanelHandraiser(cfg config.Config, rt *daemon.Runtime) (*daemon.PanelHandraiser, error) {
+	if !cfg.Verifier.Audit.Enabled {
+		return nil, nil
+	}
+	members, ok := rt.Dependencies.Keeper.(daemon.PanelMemberReader)
+	if !ok {
+		return nil, fmt.Errorf("verifier.audit needs a Keeper client that reads the Verifier candidate window")
+	}
+	if rt.TaskDataAuth == nil || rt.Dispatch == nil {
+		return nil, fmt.Errorf("verifier.audit needs the node's service identity and its Builder streams (dispatch.builders)")
+	}
+	return daemon.NewPanelHandraiser(daemon.PanelHandraiserConfig{
+		ChainID: cfg.ChainID, Operator: cfg.LocalIdentity.OperatorAddress, Members: members,
+		Binding: func(ctx context.Context) (uint64, error) {
+			nonce, _, err := rt.TaskDataAuth.CommittedServiceBinding(ctx)
+			return nonce, err
+		},
+		Sign: rt.DispatchSigner(), Sender: rt.Dispatch.Fanout(), Logger: slog.Default(),
+	})
 }

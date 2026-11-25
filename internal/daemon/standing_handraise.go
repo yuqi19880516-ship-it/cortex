@@ -67,6 +67,9 @@ type StandingHandraiseConfig struct {
 	// set every Builder's handraise is withdrawn, with ChainPausedReason. Nil
 	// means the chain is not asked.
 	ChainPause *ChainPause
+	// AuditOnly is a node with no model service: its standing handraise
+	// offers no Profile and no slot to any Builder.
+	AuditOnly bool
 }
 
 // StandingHandraiser keeps one current StandingHandraiseV1 per Builder and
@@ -398,6 +401,9 @@ func (h *StandingHandraiser) evaluate(ctx context.Context) error {
 		}
 		if paused != nil {
 			want, canWithdraw, why = nil, true, paused.Error()
+		}
+		if h.cfg.AuditOnly {
+			want, canWithdraw, why = nil, true, AuditOnlyReason
 		}
 		if want != nil {
 			if err := h.gates.builder(ctx, height, b); err != nil {

@@ -60,7 +60,12 @@ const (
 	// Builder should not have offered, so this answers an offer routed before
 	// it saw the pause.
 	classChainPaused = ChainPausedReason
+	// classAuditOnly: this node serves anchor audits only and runs no model.
+	classAuditOnly = "audit_only"
 )
+
+// AuditOnlyReason is why an audit-only node offers nothing and takes no order.
+const AuditOnlyReason = "audit_only: this node serves anchor audits only (verifier.audit.only) and runs no model service"
 
 // verdict is one signed-reject decision.
 type verdict struct {
@@ -298,6 +303,9 @@ func (d *Dispatcher) checkProfile(ctx context.Context, modelHex string, version 
 	// that was routed before the Builder saw it. Nothing is reserved here:
 	// the slot is taken with the lease (HandleOffer), and this only spares
 	// an offer that cannot get one the rest of the way.
+	if d.cfg.AuditOnly {
+		return refuse(reasonNoCapacity, classAuditOnly, "%s", AuditOnlyReason), nil
+	}
 	if err := d.cfg.ChainPause.Refusal(ctx); err != nil {
 		return refuse(reasonNoCapacity, classChainPaused, "%v", err), nil
 	}
