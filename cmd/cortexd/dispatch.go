@@ -61,6 +61,13 @@ func newDispatchPlane(cfg config.Config, rt *daemon.Runtime, runner *daemon.Task
 		pause = daemon.NewChainPause(reader, cfg.LocalIdentity.OperatorAddress,
 			time.Duration(cfg.Dispatch.ChainPauseRefreshMS)*time.Millisecond, nil, slog.Default())
 	}
+	// An audit-only node has no engine and so no concurrency setting; the
+	// lease ledger still needs a size, and no lease is ever taken (every offer
+	// is refused).
+	capacity := cfg.ModelManagement.MaxConcurrency
+	if cfg.AuditOnly() && capacity == 0 {
+		capacity = 1
+	}
 	panel, err := newPanelHandraiser(cfg, rt)
 	if err != nil {
 		return nil, err
@@ -68,7 +75,7 @@ func newDispatchPlane(cfg config.Config, rt *daemon.Runtime, runner *daemon.Task
 	return daemon.NewDispatchPlane(context.Background(), daemon.DispatchPlaneConfig{
 		Streams: rt.Dispatch, Runner: runner, Evidence: ev, Store: rt.Store,
 		ChainID: cfg.ChainID, Operator: cfg.LocalIdentity.OperatorAddress, FeeDenom: cfg.Tx.FeeDenom,
-		Profiles: profiles, Dispatch: cfg.Dispatch, Capacity: cfg.ModelManagement.MaxConcurrency,
+		Profiles: profiles, Dispatch: cfg.Dispatch, Capacity: capacity,
 		Local: rt.HandraiseLocal(), Anchor: daemon.AnchorProberOf(rt.Dependencies.Model), AnchorAdmission: rt.AnchorAdmission(), ChainPause: pause,
 		Panel: panel, AuditOnly: cfg.AuditOnly(),
 		Sign: rt.DispatchSigner(), Submitter: submitter,
@@ -100,14 +107,23 @@ func newPanelHandraiser(cfg config.Config, rt *daemon.Runtime) (*daemon.PanelHan
 	if !ok {
 		return nil, fmt.Errorf("verifier.audit needs a Keeper client that reads the Verifier candidate window")
 	}
-	if rt.TaskDataAuth == nil || rt.Dispatch == nil {
-		return nil, fmt.Errorf("verifier.audit needs the node's service identity and its Builder streams (dispatch.builders)")
+	keys, ok := rt.Dependencies.Keeper.(daemon.VerifierStreamChain)
+	if !ok || rt.Dispatch == nil {
+		return nil, fmt.Errorf("verifier.audit needs the node's service key on chain and its Builder streams (dispatch.builders)")
 	}
+	operator := cfg.LocalIdentity.OperatorAddress
 	return daemon.NewPanelHandraiser(daemon.PanelHandraiserConfig{
-		ChainID: cfg.ChainID, Operator: cfg.LocalIdentity.OperatorAddress, Members: members,
+		ChainID: cfg.ChainID, Operator: operator, Members: members,
+		// The node's own current service key, from one committed read.
 		Binding: func(ctx context.Context) (uint64, error) {
-			nonce, _, err := rt.TaskDataAuth.CommittedServiceBinding(ctx)
-			return nonce, err
+			key, _, err := keys.CommittedCurrentServiceKey(ctx, chainclient.ParticipantTypeCortexNode, operator)
+			if err != nil {
+				return 0, err
+			}
+			if key.Status != "ACTIVE" {
+				return 0, fmt.Errorf("this node's service key is %s", key.Status)
+			}
+			return key.AuthorizationNonce.Uint64(), nil
 		},
 		Sign: rt.DispatchSigner(), Sender: rt.Dispatch.Fanout(), Logger: slog.Default(),
 	})

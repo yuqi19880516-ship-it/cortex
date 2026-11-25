@@ -249,7 +249,10 @@ health:
 # each one to the local Verifier program through a spool directory:
 #   <spool_dir>/assignments/<task_id>-<panel_round>.json   written by this node
 #   <spool_dir>/votes/<task_id>-<panel_round>.json         written by the program
-# A vote is PASS, REJECT or UNAVAILABLE and is final once read. The node
+# A vote is PASS, REJECT or UNAVAILABLE and is final once read. With this
+# enabled the node also answers OPEN_VERIFY for panel rounds (verify round 2
+# and above) with a Verifier handraise, and its operator support declaration
+# carries audit_capability. The node
 # refuses to start with this enabled on a machine that holds a block
 # producer's key material (priv_validator_key.json and the like). Off by default.
 # verifier:
@@ -258,3 +261,13 @@ health:
 #     spool_dir: /var/lib/cortex/audit-spool
 #     poll_ms: 10000
 #     node_homes: []
+#     # only: true makes this an audit-only node: no model service
+#     # (model_management and local_identity.model_service_id are not needed),
+#     # the support declaration carries audit_capability alone, no Profile is
+#     # offered to any Builder and every order is refused. The node keeps its
+#     # Builder streams and raises its hand for panel rounds.
+#     only: false
+#     # submit_votes: true makes this node broadcast MsgSubmitAnchorPanelVote
+#     # for the vote the Verifier program wrote (needs tx.enabled). Leave it
+#     # false when the Verifier program broadcasts its own vote.
+#     submit_votes: false

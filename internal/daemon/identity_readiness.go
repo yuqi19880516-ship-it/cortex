@@ -93,6 +93,14 @@ func checkKeeperCoreServiceKey(ctx context.Context, identity config.LocalIdentit
 }
 
 func checkKeeperModelReadiness(ctx context.Context, identity config.LocalIdentityConfig, reader KeeperIdentityReader) error {
+	return checkKeeperModelReadinessFor(ctx, identity, reader, false)
+}
+
+// checkKeeperModelReadinessFor is checkKeeperModelReadiness for a node that may
+// be audit-only: such a node declares the audit capability alone, so its chain
+// record enables neither inference nor verification, and only the declaration
+// itself is required.
+func checkKeeperModelReadinessFor(ctx context.Context, identity config.LocalIdentityConfig, reader KeeperIdentityReader, auditOnly bool) error {
 	if reader == nil {
 		return fmt.Errorf("Keeper identity query client is required")
 	}
@@ -117,10 +125,13 @@ func checkKeeperModelReadiness(ctx context.Context, identity config.LocalIdentit
 		// node declares support for a profile as a Worker and as a Verifier, so
 		// a Keeper record that enables only one of them describes a declaration
 		// this binary can no longer make.
-		if !capability.InferenceCapability {
+		if auditOnly && !capability.AuditCapability {
+			return fmt.Errorf("Keeper model capability does not enable the audit capability for %s@%s: declare it (audit_capability) and wait for the next epoch", profile.ModelID, profileVersion)
+		}
+		if !auditOnly && !capability.InferenceCapability {
 			return fmt.Errorf("Keeper model capability does not enable WORKER inference for %s@%s", profile.ModelID, profileVersion)
 		}
-		if !capability.VerificationCapability {
+		if !auditOnly && !capability.VerificationCapability {
 			return fmt.Errorf("Keeper model capability does not enable VERIFIER verification for %s@%s", profile.ModelID, profileVersion)
 		}
 		support, err := reader.ModelSupport(ctx, operator, profile.ModelID)

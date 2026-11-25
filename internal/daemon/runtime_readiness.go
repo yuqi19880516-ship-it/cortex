@@ -168,7 +168,7 @@ func (r *Runtime) CheckWorkloadReadiness(ctx context.Context) WorkloadReadiness 
 			readiness.ServicePubkey = binding.ServicePubkey
 		}
 	}
-	if err := checkKeeperModelReadiness(ctx, r.cfg.LocalIdentity, identityReader); err != nil {
+	if err := checkKeeperModelReadinessFor(ctx, r.cfg.LocalIdentity, identityReader, r.cfg.AuditOnly()); err != nil {
 		readiness.ModelSupport.Error = err.Error()
 	} else {
 		markReady(&readiness.ModelSupport)
@@ -393,6 +393,10 @@ func cloneDiagnostics(report diagnostics.Diagnostics) diagnostics.Diagnostics {
 
 func (r *Runtime) checkModelServiceReadiness(ctx context.Context) diagnostics.DependencyStatus {
 	status := realStatus("model_service", modelEndpoint(r.cfg), false, "model service client is required")
+	if r != nil && r.cfg.AuditOnly() && r.Dependencies.Model == nil {
+		// Not a dependency of an audit-only node.
+		return realStatus("model_service", "", true, "")
+	}
 	if r == nil || r.Dependencies.Model == nil {
 		return status
 	}

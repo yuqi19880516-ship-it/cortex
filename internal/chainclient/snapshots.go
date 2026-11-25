@@ -403,18 +403,22 @@ func (s CurrentModelProfileSnapshot) Validate() error {
 // ModelCapabilitySnapshot is ModelCapabilityState: one row per (operator,
 // model), independent of profile version.
 type ModelCapabilitySnapshot struct {
-	OperatorAddress        string       `json:"operator_address"`
-	ModelID                string       `json:"model_id"`
-	InferenceCapability    bool         `json:"inference_capability"`
-	VerificationCapability bool         `json:"verification_capability"`
-	CapabilityVersion      Uint64String `json:"capability_version"`
+	OperatorAddress        string `json:"operator_address"`
+	ModelID                string `json:"model_id"`
+	InferenceCapability    bool   `json:"inference_capability"`
+	VerificationCapability bool   `json:"verification_capability"`
+	// AuditCapability is ModelCapabilityState.audit_capability (field 7, wire
+	// v0.6.3-verifier-flow.1): the node may serve on anchor audit panels. It
+	// may be the only capability of an audit-only node.
+	AuditCapability   bool         `json:"audit_capability,omitempty"`
+	CapabilityVersion Uint64String `json:"capability_version"`
 }
 
 func (s ModelCapabilitySnapshot) Validate() error {
 	if s.OperatorAddress == "" || !identity.ValidModelIDHex(s.ModelID) {
 		return fmt.Errorf("Keeper model capability identity is required")
 	}
-	if !s.InferenceCapability && !s.VerificationCapability {
+	if !s.InferenceCapability && !s.VerificationCapability && !s.AuditCapability {
 		return fmt.Errorf("Keeper model capability must enable inference or verification")
 	}
 	if s.CapabilityVersion.Uint64() == 0 {

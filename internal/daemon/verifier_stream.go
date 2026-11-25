@@ -29,8 +29,11 @@ type VerifierStreamConfig struct {
 	// Panel answers OPEN_VERIFY for the Verifier panel rounds of anchor audits
 	// (verify_round 2 and above). Nil leaves such a message refused as an
 	// unsupported round, as before.
-	Panel  *PanelHandraiser
-	Logger *slog.Logger
+	Panel *PanelHandraiser
+	// AuditOnly is a node with no model service: a round 1 OPEN_VERIFY (a
+	// logprob verification it cannot perform) is acknowledged and dropped.
+	AuditOnly bool
+	Logger    *slog.Logger
 }
 
 // ErrBuilderMessageBinding marks an OPEN_VERIFY or VERIFIER_ASSIGNMENT_NOTIFY
@@ -117,6 +120,9 @@ func (s *VerifierStream) openVerify(ctx context.Context, from string, m *nexusv1
 	}
 	if s.cfg.Panel != nil && IsPanelRound(m) {
 		return s.cfg.Panel.OpenVerify(m)
+	}
+	if s.cfg.AuditOnly {
+		return nil
 	}
 	trigger, err := openVerifyTrigger(from, m)
 	if err != nil {

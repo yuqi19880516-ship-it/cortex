@@ -438,7 +438,7 @@ func (c *Config) dispatchProblems() []string {
 	if s.ReconnectMinMS > maxDurationMS || s.ReconnectMaxMS > maxDurationMS {
 		problems = append(problems, fmt.Sprintf("dispatch.stream reconnect bounds are too large (at most %d)", maxDurationMS))
 	}
-	if c.ModelManagement.MaxConcurrency == 0 {
+	if c.ModelManagement.MaxConcurrency == 0 && !c.AuditOnly() {
 		problems = append(problems, "model_management.max_concurrency must be greater than zero when dispatch.builders is set: it is the standing handraise capacity")
 	}
 	// Without tx.enabled the node has no direct transaction path (a file://

@@ -283,11 +283,37 @@ func TestVerifierStreamRoutesPanelRounds(t *testing.T) {
 	if with.wakes.Load() != 0 {
 		t.Fatal("a panel round does not enter the logprob Verifier inbox")
 	}
+	// An audit-only node drops round 1 instead of queueing a verification it
+	// cannot perform.
+	only := newVSHarness(t)
+	only.stream.cfg.Panel, only.stream.cfg.AuditOnly = h.p, true
+	if err := only.stream.HandleFrame(context.Background(), "builder-1", frame(1)); err != nil || only.wakes.Load() != 0 {
+		t.Fatalf("an audit-only node must acknowledge and drop round 1: %v, wakes %d", err, only.wakes.Load())
+	}
 	// Round 1 still takes the logprob path.
 	if err := with.stream.HandleFrame(context.Background(), "builder-1", frame(1)); err != nil {
 		t.Fatal(err)
 	}
 	if len(h.sender.sent) != 1 || with.wakes.Load() != 1 {
 		t.Fatalf("round 1 must go to the logprob inbox: panel sent %d, wakes %d", len(h.sender.sent), with.wakes.Load())
+	}
+}
+
+// An audit-only node is ready on a capability row that enables the audit
+// capability alone; any other node still needs inference and verification.
+func TestModelReadinessOfAnAuditOnlyNode(t *testing.T) {
+	reader := readyKeeperIdentityReader()
+	reader.capability.InferenceCapability, reader.capability.VerificationCapability = false, false
+	reader.capability.AuditCapability = true
+	reader.support.SupportActive = false // an audit-only support row is never active
+	if err := checkKeeperModelReadinessFor(context.Background(), readyLocalIdentity(), reader, true); err != nil {
+		t.Fatalf("audit-only readiness: %v", err)
+	}
+	if err := checkKeeperModelReadiness(context.Background(), readyLocalIdentity(), reader); err == nil {
+		t.Fatal("a node that is not audit-only still needs inference and verification")
+	}
+	reader.capability.AuditCapability, reader.capability.InferenceCapability = false, true
+	if err := checkKeeperModelReadinessFor(context.Background(), readyLocalIdentity(), reader, true); err == nil {
+		t.Fatal("an audit-only node needs the audit capability on chain")
 	}
 }

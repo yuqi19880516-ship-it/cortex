@@ -260,3 +260,15 @@ func unsupportedQuery(err error) bool {
 	return strings.Contains(text, "Unimplemented") || strings.Contains(text, "unknown query path") ||
 		strings.Contains(text, "unknown service") || strings.Contains(text, "unknown method")
 }
+
+// auditCapabilityOf reads ModelCapabilityState.audit_capability (field 7) from
+// the fields the generated bindings do not know yet.
+func auditCapabilityOf(unknown []byte) bool {
+	audit := false
+	_ = walkFields(unknown, func(num protowire.Number, typ protowire.Type, varint uint64, _ []byte) {
+		if num == 7 && typ == protowire.VarintType {
+			audit = varint != 0
+		}
+	})
+	return audit
+}

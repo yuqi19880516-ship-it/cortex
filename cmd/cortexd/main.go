@@ -34,6 +34,10 @@ import (
 
 var runtimeBuilder = buildDaemonRuntime
 
+// auditHost is what the audit capability's block-producer check reads; tests
+// replace it.
+var auditHost = auditduty.OSHost
+
 func buildDaemonRuntime(ctx context.Context, cfg config.Config) (*daemon.Runtime, error) {
 	return daemon.BuildRuntimeWithOptions(ctx, cfg, daemonRuntimeOptions())
 }
@@ -342,7 +346,7 @@ func runDaemon(ctx context.Context, cfg config.Config) error {
 	if renewer := newSupportRenewer(cfg, runtime, registry); renewer != nil {
 		runners = append(runners, renewer.Run)
 	}
-	auditRunner, err := newAuditDuty(cfg, runtime, auditduty.OSHost())
+	auditRunner, err := newAuditDuty(cfg, runtime, auditHost())
 	if err != nil {
 		cleanupRuntime()
 		stopRuntime()
@@ -799,7 +803,12 @@ func runRuntimeRunnerGroupWithStarted(ctx context.Context, runners []runtimeRunn
 }
 
 func newTaskRunner(cfg config.Config, rt *daemon.Runtime) (*daemon.TaskRunner, error) {
-	if !cfg.UsesRealDependencies() || rt == nil || rt.Store == nil || rt.Dependencies.Model == nil || rt.Dependencies.Builder == nil {
+	// An audit-only node has no model service, and still needs the runner's
+	// Builder streams: panel rounds arrive on them. It is never offered or
+	// assigned work that needs a model (its handraise offers nothing, every
+	// offer is refused, and round 1 OPEN_VERIFY is dropped).
+	noModel := rt != nil && rt.Dependencies.Model == nil && !cfg.AuditOnly()
+	if !cfg.UsesRealDependencies() || rt == nil || rt.Store == nil || noModel || rt.Dependencies.Builder == nil {
 		return nil, nil
 	}
 	identityStatus, ok := rt.Dependencies.Diagnostics.Dependency("keeper_identity")

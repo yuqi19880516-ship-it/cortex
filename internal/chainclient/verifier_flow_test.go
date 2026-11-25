@@ -101,3 +101,24 @@ func TestUnsupportedQuery(t *testing.T) {
 		t.Fatal("a transport failure is not an unsupported query")
 	}
 }
+
+func TestAuditCapabilityIsReadFromTheUnknownField(t *testing.T) {
+	if auditCapabilityOf(nil) {
+		t.Fatal("absent means false")
+	}
+	if !auditCapabilityOf(vfVarint(vfBytes(nil, 99, []byte("x")), 7, 1)) {
+		t.Fatal("field 7 = true must be read")
+	}
+	if auditCapabilityOf(vfVarint(nil, 7, 0)) || auditCapabilityOf(vfVarint(nil, 6, 1)) {
+		t.Fatal("only field 7 set to true counts")
+	}
+	only := ModelCapabilitySnapshot{OperatorAddress: "op", ModelID: "1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c",
+		AuditCapability: true, CapabilityVersion: NewUint64String(1)}
+	if err := only.Validate(); err != nil {
+		t.Fatalf("an audit-only capability row is valid: %v", err)
+	}
+	only.AuditCapability = false
+	if err := only.Validate(); err == nil {
+		t.Fatal("a row with no capability is still refused")
+	}
+}

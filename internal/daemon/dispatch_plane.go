@@ -127,7 +127,7 @@ func NewDispatchPlane(ctx context.Context, cfg DispatchPlaneConfig) (*DispatchPl
 		return nil, err
 	}
 	vs, err := NewVerifierStream(VerifierStreamConfig{ChainID: cfg.ChainID, Chain: cfg.VerifierChain, Store: cfg.Store,
-		Assignment: cfg.Runner.recordVerifierAssignment, Wake: cfg.Runner.Wake, Panel: cfg.Panel, Logger: cfg.Logger})
+		Assignment: cfg.Runner.recordVerifierAssignment, Wake: cfg.Runner.Wake, Panel: cfg.Panel, AuditOnly: cfg.AuditOnly, Logger: cfg.Logger})
 	if err != nil {
 		return nil, err
 	}
@@ -153,6 +153,10 @@ func NewDispatchPlane(ctx context.Context, cfg DispatchPlaneConfig) (*DispatchPl
 	s.plane.Store(p)
 	return p, nil
 }
+
+// ServesPanelRounds reports whether the plane answers OPEN_VERIFY for the
+// Verifier panel rounds of anchor audits.
+func (p *DispatchPlane) ServesPanelRounds() bool { return p != nil && p.cfg.Panel != nil }
 
 // Runners are the plane's workload loops; they stop with the workload, so a
 // node that is not ready sends no handraise (CD §4.2.2).

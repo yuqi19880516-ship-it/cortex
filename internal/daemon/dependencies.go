@@ -164,6 +164,9 @@ func BuildDependencies(cfg config.Config, opts DependencyOptions) (Dependencies,
 		deps.Model = opts.ModelClient
 	case opts.ModelTransport != nil:
 		deps.Model = modelservice.NewRemoteClient(opts.ModelTransport)
+	case cfg.AuditOnly():
+		// An audit-only node has no model service: no client is built, and the
+		// workload that needs one (inference, logprob verification) never runs.
 	case isLocalModelTransport(cfg):
 		// Only models bound to their chain repo_id are advertised or served.
 		// The binding needs a chain read, so it happens in the model-service

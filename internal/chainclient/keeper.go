@@ -572,6 +572,7 @@ func (c *KeeperABCIClient) modelCapabilityAt(ctx context.Context, operatorAddres
 		OperatorAddress: state.OperatorAddress, ModelID: modelID,
 		InferenceCapability: state.InferenceCapability, VerificationCapability: state.VerificationCapability,
 		CapabilityVersion: NewUint64String(state.CapabilityVersion),
+		AuditCapability:   auditCapabilityOf(state.ProtoReflect().GetUnknown()),
 	}
 	return capability, capability.Validate()
 }
