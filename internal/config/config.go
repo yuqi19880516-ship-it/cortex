@@ -65,6 +65,10 @@ type Config struct {
 	Verifier          VerifierConfig          `yaml:"verifier"`
 }
 
+// AuditOnly reports a node that serves the audit capability and nothing else:
+// no model service, no inference, no logprob verification.
+func (c *Config) AuditOnly() bool { return c.Verifier.Audit.Enabled && c.Verifier.Audit.Only }
+
 // VerifierConfig groups the Verifier duties that need no model service.
 type VerifierConfig struct {
 	Audit AuditDutyConfig `yaml:"audit"`
@@ -85,6 +89,16 @@ type AuditDutyConfig struct {
 	// block producer's key material. The node refuses to start with the audit
 	// capability on a machine where any is found.
 	NodeHomes []string `yaml:"node_homes"`
+	// Only makes the node an audit-only Verifier: it has no model service, its
+	// support declaration carries audit_capability alone, and it serves no
+	// inference and no logprob verification. local_identity.model_service_id
+	// and model_management are not needed.
+	Only bool `yaml:"only"`
+	// SubmitVotes makes this node broadcast MsgSubmitAnchorPanelVote for the
+	// votes the Verifier program writes to the spool (needs tx.enabled and a
+	// signer that can sign transactions). Off by default: the Verifier
+	// program broadcasts its own vote. Enable it on one side only.
+	SubmitVotes bool `yaml:"submit_votes"`
 }
 
 // DefaultHandraiseRootHistory bounds HeldRootDigests per Builder. It is a
@@ -1235,8 +1249,11 @@ func (c *Config) collectRequiredFields(modelTransport, inputResolver string) []r
 		required = append(required,
 			requiredField{field: "local_identity.operator_address", value: c.LocalIdentity.OperatorAddress, consumer: "taskdataauth"},
 			requiredField{field: "local_identity.service_key_ref", value: c.LocalIdentity.ServiceKeyRef, consumer: "signer"},
-			requiredField{field: "local_identity.model_service_id", value: c.LocalIdentity.ModelServiceID, consumer: "modelservice"},
 		)
+		if !c.AuditOnly() {
+			required = append(required,
+				requiredField{field: "local_identity.model_service_id", value: c.LocalIdentity.ModelServiceID, consumer: "modelservice"})
+		}
 		if c.Tx.Enabled {
 			required = append(required,
 				requiredField{field: "node.rest_endpoint", value: c.Node.RESTEndpoint, consumer: "chainclient"},
@@ -1260,6 +1277,12 @@ func (c *Config) Validate() error {
 	}
 	if c.Verifier.Audit.Enabled && strings.TrimSpace(c.Verifier.Audit.SpoolDir) == "" {
 		problems = append(problems, "verifier.audit.spool_dir is required when verifier.audit.enabled is true")
+	}
+	if !c.Verifier.Audit.Enabled && (c.Verifier.Audit.Only || c.Verifier.Audit.SubmitVotes) {
+		problems = append(problems, "verifier.audit.only and verifier.audit.submit_votes need verifier.audit.enabled")
+	}
+	if c.Verifier.Audit.SubmitVotes && !c.Tx.Enabled {
+		problems = append(problems, "verifier.audit.submit_votes needs tx.enabled: without a transaction path the Verifier program must broadcast its own vote")
 	}
 	// Backward compatibility: the deprecated evidence.* keys are accepted for one
 	// release. Any value set under evidence.* is copied into artifacts.* only

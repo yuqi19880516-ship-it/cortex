@@ -101,6 +101,7 @@ func (k Kind) Valid() bool {
 		MsgSubmitVerifyCommit,
 		MsgSubmitVerifyResult,
 		MsgReportDataUnavailable,
+		MsgSubmitAnchorPanelVote,
 		MsgSettleTask,
 		MsgSweepDeadline:
 		return true

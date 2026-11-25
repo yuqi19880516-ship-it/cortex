@@ -290,6 +290,11 @@ type DeclareModelSupportMessage struct {
 	ModelID                ProtoBytes32 `json:"model_id"`
 	InferenceCapability    bool         `json:"inference_capability"`
 	VerificationCapability bool         `json:"verification_capability"`
+	// AuditCapability declares the node a Verifier of anchor audits (wire
+	// v0.6.3-verifier-flow.1, field 6). It may be the only capability: such a
+	// node needs no engine. Omitted when false, so a declaration without it is
+	// byte for byte what it was.
+	AuditCapability bool `json:"audit_capability,omitempty"`
 }
 
 type ModelSupportConfirmation struct {
@@ -527,6 +532,8 @@ func ValidateMessagePayload(kind Kind, payload []byte) error {
 		target = &SubmitVerifyResultMessage{}
 	case MsgReportDataUnavailable:
 		target = &ReportDataUnavailableMessage{}
+	case MsgSubmitAnchorPanelVote:
+		target = &SubmitAnchorPanelVoteMessage{}
 	case MsgSettleTask:
 		target = &SettleTaskMessage{}
 	case MsgSweepDeadline:
@@ -557,6 +564,8 @@ func ValidateMessagePayload(kind Kind, payload []byte) error {
 		return validateMessageType(kind, *value)
 	case *ReportDataUnavailableMessage:
 		return validateMessageType(kind, *value)
+	case *SubmitAnchorPanelVoteMessage:
+		return validateMessageType(kind, *value)
 	case *SettleTaskMessage:
 		return validateMessageType(kind, *value)
 	case *SweepDeadlineMessage:
@@ -582,7 +591,7 @@ func validateMessageType(kind Kind, value any) error {
 		if err := requireStrings(m.OperatorAddress, string(m.ModelID)); err != nil {
 			return err
 		}
-		if !m.InferenceCapability && !m.VerificationCapability {
+		if !m.InferenceCapability && !m.VerificationCapability && !m.AuditCapability {
 			return fmt.Errorf("at least one capability is required")
 		}
 		return nil
@@ -647,6 +656,12 @@ func validateMessageType(kind Kind, value any) error {
 			return messageTypeMismatch(kind)
 		}
 		return validateReportDataUnavailable(m)
+	case MsgSubmitAnchorPanelVote:
+		m, ok := value.(SubmitAnchorPanelVoteMessage)
+		if !ok {
+			return messageTypeMismatch(kind)
+		}
+		return validateSubmitAnchorPanelVote(m)
 	case MsgSettleTask:
 		m, ok := value.(SettleTaskMessage)
 		if !ok {

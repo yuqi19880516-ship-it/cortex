@@ -45,17 +45,21 @@ type RegistryConfig struct {
 	// NowHeight resolves the current chain height. It must report an error
 	// when the height cannot be determined so callers fail closed instead of
 	// treating an unknown height as zero.
-	NowHeight                  func() (uint64, error)
-	Treasury                   string
-	FeeDenom                   string
-	Submitter                  TxSubmitter
-	SelfTester                 SelfTestFunc
-	Signer                     Signer
-	FeeGrant                   StaticFeeGrant
-	MinGasGrant                uint64
-	SupporterAddress           string
-	InferenceCapability        bool
-	VerificationCapability     bool
+	NowHeight              func() (uint64, error)
+	Treasury               string
+	FeeDenom               string
+	Submitter              TxSubmitter
+	SelfTester             SelfTestFunc
+	Signer                 Signer
+	FeeGrant               StaticFeeGrant
+	MinGasGrant            uint64
+	SupporterAddress       string
+	InferenceCapability    bool
+	VerificationCapability bool
+	// AuditCapability adds audit_capability to the operator's support
+	// declaration: the node serves as a Verifier of anchor audits. With the
+	// other two false the declaration is audit-only (no engine).
+	AuditCapability            bool
 	SupportConfirmer           SupportConfirmer
 	RequireSupportConfirmation bool
 }
@@ -80,6 +84,7 @@ type Registry struct {
 	supporterAddress             string
 	inferenceCapability          bool
 	verificationCapability       bool
+	auditCapability              bool
 	supportConfirmer             SupportConfirmer
 	requireSupportConfirmation   bool
 	statuses                     map[string]ModelStatus
@@ -222,6 +227,7 @@ func NewRegistry(config RegistryConfig) *Registry {
 		supporterAddress:             strings.TrimSpace(config.SupporterAddress),
 		inferenceCapability:          config.InferenceCapability,
 		verificationCapability:       config.VerificationCapability,
+		auditCapability:              config.AuditCapability,
 		supportConfirmer:             config.SupportConfirmer,
 		requireSupportConfirmation:   config.RequireSupportConfirmation,
 		statuses:                     make(map[string]ModelStatus),
@@ -348,6 +354,7 @@ func (r *Registry) PrepareOperatorSupportIntent(_ context.Context, req SupportRe
 		ModelID:                txclient.ProtoBytes32(modelID),
 		InferenceCapability:    r.inferenceCapability,
 		VerificationCapability: r.verificationCapability,
+		AuditCapability:        r.auditCapability,
 	}
 	if _, err := txclient.MarshalMessage(txclient.MsgDeclareModelSupport, message); err != nil {
 		return OperatorSupportIntent{}, err

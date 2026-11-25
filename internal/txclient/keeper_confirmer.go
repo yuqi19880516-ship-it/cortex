@@ -138,7 +138,7 @@ func (c keeperConfirmer) Confirm(ctx context.Context, req Request, included Incl
 			state.Assignment.SelectedWorker == msg.Receipt.WorkerOperatorAddress &&
 			state.InferReceipt.OutputHash.String() == msg.Receipt.OutputHash.Hex(), err
 
-	case MsgSubmitVerifyCommit, MsgSubmitVerifyResult, MsgReportDataUnavailable:
+	case MsgSubmitVerifyCommit, MsgSubmitVerifyResult, MsgReportDataUnavailable, MsgSubmitAnchorPanelVote:
 		// A code-0 DeliverTx inclusion is taken as confirmation for these three.
 		// CommitState is readable (task.v1.Query/VerifyCommit, which the reveal
 		// gate uses to require its own row), but this confirmer is not wired to

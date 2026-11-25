@@ -1009,8 +1009,9 @@ func newModelRegistry(cfg config.Config, rt *daemon.Runtime) *modelregistry.Regi
 		SupporterAddress: cfg.LocalIdentity.OperatorAddress,
 		// Duty selection is retired: a node declares every profile it supports
 		// for both responsibilities, because it can be drawn for either.
-		InferenceCapability:        true,
-		VerificationCapability:     true,
+		InferenceCapability:        !cfg.AuditOnly(),
+		VerificationCapability:     !cfg.AuditOnly(),
+		AuditCapability:            cfg.Verifier.Audit.Enabled,
 		RequireSupportConfirmation: cfg.UsesRealDependencies(),
 	}
 	if cfg.Mode == config.ModeFake {
